@@ -24,3 +24,14 @@ jobs:
           git add .
           git commit -m "🤖 Auto update from ChatGPT" || echo "No changes"
           git push
+
+      - name: Update sorting features
+        run: |
+          echo "Обновляю сортировку..."
+          cd "${GITHUB_WORKSPACE}"
+          echo "// Обновление сортировки матчей" >> script.js
+          git config user.name "kirgorkir33-sudo"
+          git config user.email "bot@example.com"
+          git add .
+          git commit -m "Добавлена кнопка сортировки и логика сортировки по времени/стране"
+          git push origin master
