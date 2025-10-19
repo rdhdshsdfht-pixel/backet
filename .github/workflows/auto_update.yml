@@ -1,0 +1,33 @@
+name: Auto Update Frontend
+
+on:
+  workflow_dispatch: # запуск вручную
+  push:
+    branches:
+      - master
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Apply local template updates
+        run: |
+          echo "🧠 Applying template updates..."
+          # Здесь пример изменения кода:
+          sed -i 's/Сортировать по времени/Сортировать по дате/' index.html || true
+          sed -i 's/currentSort = .*/currentSort = "time"/' script.js || true
+          echo "✅ Обновления внесены локально."
+
+      - name: Commit & Push
+        run: |
+          git config --global user.name "kirgorkir33-sudo"
+          git config --global user.email "bot@example.com"
+          git add .
+          git commit -m "🤖 Auto update from template" || echo "No changes"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
