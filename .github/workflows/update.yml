@@ -1,0 +1,26 @@
+name: Apply ChatGPT Updates
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Apply changes from ChatGPT
+        run: |
+          echo "🤖 Applying updates..."
+          git config --global user.name "chatgpt-bot"
+          git config --global user.email "bot@example.com"
+          git add .
+          git commit -m "🤖 Auto update from ChatGPT" || echo "No changes"
+          git push
