@@ -124,4 +124,4 @@ searchInput.addEventListener('input', renderTable);
 dateInput.addEventListener('change', fetchMatches);
 
 initDate();
-fetchMatches();
+fetchMatches();// Обновление сортировки матчей
