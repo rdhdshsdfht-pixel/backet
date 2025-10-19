@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Basket Smart Tables</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <header>
+    <h1>Basket Smart Tables</h1>
+
+    <div class="controls">
+      <input type="date" id="date">
+
+      <select id="league">
+        <option value="">Все лиги</option>
+      </select>
+
+      <label style="margin-left: 10px;">
+        <input type="checkbox" id="liveOnly"> Только live
+      </label>
+
+      <input type="text" id="search" placeholder="Поиск по команде...">
+      <button id="refresh">🔄 Обновить</button>
+    </div>
+  </header>
+
+  <main>
+    <table id="matches">
+      <thead>
+        <tr>
+          <th>Дата</th>
+          <th>Лига</th>
+          <th>Дом</th>
+          <th>Счёт</th>
+          <th>Гость</th>
+          <th>Статус</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td colspan="6">Загрузка...</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <footer>
+      <p>Источник данных: BasketAPI (RapidAPI) · Таймзона: Москва</p>
+    </footer>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+</body>
+
+</html>
