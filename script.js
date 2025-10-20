@@ -368,14 +368,35 @@ async function fetchMatchCenterData(match) {
 function normalizeMatchCenterPayload(payload) {
   const source = unwrapPayload(payload);
 
-  const headToHead = pickArray(source, ['headToHead', 'h2h', 'faceToFace', 'matches']);
-  const homeRecent = pickArray(source, ['homeRecent', 'homeLastMatches', 'homeMatches', 'home']);
-  const awayRecent = pickArray(source, ['awayRecent', 'awayLastMatches', 'awayMatches', 'away']);
+  const headToHeadRaw = pickArray(source, [
+    'headToHead',
+    'h2h',
+    'faceToFace',
+    'matches',
+    'head_to_head',
+    'head2head'
+  ]);
+  const homeRecentRaw = pickArray(source, [
+    'homeRecent',
+    'homeLastMatches',
+    'homeMatches',
+    'home',
+    'homeTeamMatches',
+    'home_last_matches'
+  ]);
+  const awayRecentRaw = pickArray(source, [
+    'awayRecent',
+    'awayLastMatches',
+    'awayMatches',
+    'away',
+    'awayTeamMatches',
+    'away_last_matches'
+  ]);
 
   return {
-    headToHead,
-    homeRecent,
-    awayRecent
+    headToHead: normalizeMatchList(headToHeadRaw),
+    homeRecent: normalizeMatchList(homeRecentRaw),
+    awayRecent: normalizeMatchList(awayRecentRaw)
   };
 }
 
@@ -409,6 +430,9 @@ function pickArray(object, keys) {
     if (Array.isArray(value)) {
       return value;
     }
+    if (value && Array.isArray(value.matches)) {
+      return value.matches;
+    }
     if (value && Array.isArray(value.events)) {
       return value.events;
     }
@@ -418,6 +442,325 @@ function pickArray(object, keys) {
   }
 
   return [];
+}
+
+function normalizeMatchList(matches) {
+  if (!Array.isArray(matches)) {
+    return [];
+  }
+
+  return matches
+    .map(normalizeMatchRecord)
+    .filter(Boolean);
+}
+
+function normalizeMatchRecord(match) {
+  if (!match || typeof match !== 'object') {
+    return null;
+  }
+
+  const normalized = { ...match };
+
+  if (!normalized.startTimestamp) {
+    const timestamp = resolveStartTimestamp(match);
+    if (timestamp) {
+      normalized.startTimestamp = timestamp;
+    }
+  }
+
+  const teams = resolveTeamsFromMatch(match);
+  if (teams.home && !normalized.homeTeam) {
+    normalized.homeTeam = teams.home;
+  }
+  if (teams.away && !normalized.awayTeam) {
+    normalized.awayTeam = teams.away;
+  }
+
+  if ((normalized.homeScore === undefined || normalized.homeScore === null)) {
+    const homeScore = resolveScoreFromMatch(match, 'home');
+    if (homeScore !== null) {
+      normalized.homeScore = homeScore;
+    }
+  }
+
+  if ((normalized.awayScore === undefined || normalized.awayScore === null)) {
+    const awayScore = resolveScoreFromMatch(match, 'away');
+    if (awayScore !== null) {
+      normalized.awayScore = awayScore;
+    }
+  }
+
+  return normalized;
+}
+
+function resolveStartTimestamp(match) {
+  const candidates = [
+    match.startTimestamp,
+    match.start_time,
+    match.startTime,
+    match.start,
+    match.timestamp,
+    match.eventTimestamp,
+    match.startDate,
+    match.startDateTimestamp,
+    match.date,
+    match.utcStartTimestamp,
+    match.startUtcTimestamp,
+    match.kickoff,
+    match.startAt,
+    match.start_at,
+    match.matchTimestamp
+  ];
+
+  for (const candidate of candidates) {
+    const value = normalizeTimestamp(candidate);
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function normalizeTimestamp(value) {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  if (typeof value === 'number') {
+    return value > 1e12 ? Math.round(value / 1000) : value;
+  }
+
+  if (typeof value === 'string') {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+      return numeric > 1e12 ? Math.round(numeric / 1000) : numeric;
+    }
+
+    const parsed = Date.parse(value);
+    if (!Number.isNaN(parsed)) {
+      return Math.round(parsed / 1000);
+    }
+  }
+
+  return null;
+}
+
+function resolveTeamsFromMatch(match) {
+  const homeCandidates = [
+    match.homeTeam,
+    match.home_team,
+    match.home,
+    match.team1,
+    match.teams?.home,
+    match.teams?.homeTeam,
+    match.competitors?.home,
+    match.competitors?.find?.(team => isHomeQualifier(team.qualifier)),
+    match.participants?.home,
+    match.participants?.find?.(team => isHomeQualifier(team.qualifier))
+  ];
+
+  const awayCandidates = [
+    match.awayTeam,
+    match.away_team,
+    match.away,
+    match.team2,
+    match.teams?.away,
+    match.teams?.awayTeam,
+    match.competitors?.away,
+    match.competitors?.find?.(team => isAwayQualifier(team.qualifier)),
+    match.participants?.away,
+    match.participants?.find?.(team => isAwayQualifier(team.qualifier))
+  ];
+
+  const home = coerceTeam(homeCandidates);
+  const away = coerceTeam(awayCandidates);
+
+  return { home, away };
+}
+
+function isHomeQualifier(value) {
+  return typeof value === 'string' && ['home', '1', 'h', 'host'].includes(value.toLowerCase());
+}
+
+function isAwayQualifier(value) {
+  return typeof value === 'string' && ['away', '2', 'a', 'guest'].includes(value.toLowerCase());
+}
+
+function coerceTeam(candidates) {
+  if (!candidates) {
+    return null;
+  }
+
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+
+    if (typeof candidate === 'string') {
+      return { name: candidate };
+    }
+
+    if (candidate.team) {
+      return { ...candidate.team };
+    }
+
+    if (candidate.entity) {
+      return { ...candidate.entity };
+    }
+
+    if (candidate.name || candidate.id || candidate.slug || candidate.teamId) {
+      return { ...candidate };
+    }
+  }
+
+  return null;
+}
+
+function resolveScoreFromMatch(match, side) {
+  const direct = side === 'home' ? match.homeScore ?? match.home_score : match.awayScore ?? match.away_score;
+  const altContainers = [match.score, match.scores, match.result, match.results, match.fullScore, match.finalScore];
+  const qualifierSource = match.competitors || match.participants;
+
+  const directValue = extractScoreFromValue(direct, side);
+  if (directValue !== null) {
+    return directValue;
+  }
+
+  for (const container of altContainers) {
+    if (!container || typeof container !== 'object') {
+      continue;
+    }
+
+    const value = extractScoreFromValue(container[side], side);
+    if (value !== null) {
+      return value;
+    }
+
+    const camelKey = side === 'home' ? 'homeScore' : 'awayScore';
+    const snakeKey = side === 'home' ? 'home_score' : 'away_score';
+    const camelValue = extractScoreFromValue(container[camelKey], side);
+    if (camelValue !== null) {
+      return camelValue;
+    }
+
+    const snakeValue = extractScoreFromValue(container[snakeKey], side);
+    if (snakeValue !== null) {
+      return snakeValue;
+    }
+
+    const qualifierKey = side === 'home' ? 'home' : 'away';
+    const altValue = extractScoreFromValue(container[qualifierKey], side);
+    if (altValue !== null) {
+      return altValue;
+    }
+  }
+
+  if (Array.isArray(qualifierSource)) {
+    for (const team of qualifierSource) {
+      if (!team || typeof team !== 'object') {
+        continue;
+      }
+
+      if ((side === 'home' && isHomeQualifier(team.qualifier)) || (side === 'away' && isAwayQualifier(team.qualifier))) {
+        const teamScore = extractScoreFromValue(team.score, side);
+        if (teamScore !== null) {
+          return teamScore;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function extractScoreFromValue(score, side) {
+  if (score === undefined || score === null) {
+    return null;
+  }
+
+  if (typeof score === 'number') {
+    return score;
+  }
+
+  if (typeof score === 'string') {
+    const cleaned = score.replace(/[^0-9:\-]/g, '').trim();
+    if (!cleaned) {
+      return null;
+    }
+
+    if (cleaned.includes(':') || cleaned.includes('-')) {
+      const delimiter = cleaned.includes(':') ? ':' : '-';
+      const [first, second] = cleaned.split(delimiter).map(part => Number(part.trim()));
+      if (side === 'away') {
+        return Number.isFinite(second) ? second : null;
+      }
+      return Number.isFinite(first) ? first : null;
+    }
+
+    const numeric = Number(cleaned);
+    return Number.isFinite(numeric) ? numeric : null;
+  }
+
+  if (typeof score === 'object') {
+    if (typeof score[side] === 'number') {
+      return score[side];
+    }
+    if (side === 'home' && typeof score.homeScore === 'number') {
+      return score.homeScore;
+    }
+    if (side === 'away' && typeof score.awayScore === 'number') {
+      return score.awayScore;
+    }
+    if (score.points && typeof score.points === 'object' && typeof score.points[side] === 'number') {
+      return score.points[side];
+    }
+    if (typeof score.score === 'number') {
+      return score.score;
+    }
+    if (typeof score.value === 'number') {
+      return score.value;
+    }
+    if (typeof score.current === 'number') {
+      return score.current;
+    }
+    if (typeof score.final === 'number') {
+      return score.final;
+    }
+    if (typeof score.total === 'number') {
+      return score.total;
+    }
+    if (score.display) {
+      return extractScoreFromValue(score.display, side);
+    }
+  }
+
+  return null;
+}
+
+function doesMatchIncludeTeam(match, team) {
+  if (!match || !team) {
+    return false;
+  }
+
+  return isSameTeam(match.homeTeam, team) || isSameTeam(match.awayTeam, team);
+}
+
+function extractTeamName(team) {
+  if (!team || typeof team !== 'object') {
+    return null;
+  }
+
+  return (
+    team.name ||
+    team.shortName ||
+    team.teamName ||
+    team.title ||
+    team.fullName ||
+    team.abbreviation ||
+    team.slug ||
+    null
+  );
 }
 
 function renderTeamHistory(listElement, matches, referenceTeam) {
@@ -430,16 +773,49 @@ function renderTeamHistory(listElement, matches, referenceTeam) {
     return;
   }
 
+  const normalizedMatches = matches.filter(Boolean);
+  const relevantMatches = referenceTeam
+    ? normalizedMatches.filter(match => doesMatchIncludeTeam(match, referenceTeam))
+    : normalizedMatches;
+  const matchesToRender = (relevantMatches.length > 0 ? relevantMatches : normalizedMatches)
+    .sort((a, b) => (b.startTimestamp ?? 0) - (a.startTimestamp ?? 0));
+
+  if (matchesToRender.length === 0) {
+    listElement.innerHTML = '<li class="placeholder">Нет данных</li>';
+    return;
+  }
+
   listElement.innerHTML = '';
 
-  const sortedMatches = [...matches].sort((a, b) => (b.startTimestamp ?? 0) - (a.startTimestamp ?? 0));
-
-  sortedMatches.forEach(match => {
+  matchesToRender.forEach(match => {
     const listItem = document.createElement('li');
-    const isHomeTeam = isSameTeam(match.homeTeam, referenceTeam);
-    const opponent = isHomeTeam ? match.awayTeam?.name : match.homeTeam?.name;
+    const isHomeTeam = referenceTeam
+      ? isSameTeam(match.homeTeam, referenceTeam)
+        ? true
+        : isSameTeam(match.awayTeam, referenceTeam)
+          ? false
+          : null
+      : null;
+    const opponentTeam = (() => {
+      if (isHomeTeam === true) {
+        return match.awayTeam;
+      }
+      if (isHomeTeam === false) {
+        return match.homeTeam;
+      }
+      if (referenceTeam) {
+        if (match.homeTeam && !isSameTeam(match.homeTeam, referenceTeam)) {
+          return match.homeTeam;
+        }
+        if (match.awayTeam && !isSameTeam(match.awayTeam, referenceTeam)) {
+          return match.awayTeam;
+        }
+      }
+      return match.awayTeam || match.homeTeam;
+    })();
+    const opponent = opponentTeam ? extractTeamName(opponentTeam) : null;
     const { home: homeScore, away: awayScore } = extractScores(match);
-    const outcome = determineOutcome(match, isHomeTeam);
+    const outcome = referenceTeam && isHomeTeam !== null ? determineOutcome(match, isHomeTeam) : null;
 
     const opponentSpan = document.createElement('span');
     opponentSpan.className = 'history-opponent';
@@ -487,9 +863,20 @@ function renderHeadToHead(matches, homeTeam, awayTeam) {
     return;
   }
 
+  const normalizedMatches = matches.filter(Boolean);
+  const relevantMatches = normalizedMatches.filter(match =>
+    doesMatchIncludeTeam(match, homeTeam) && doesMatchIncludeTeam(match, awayTeam)
+  );
+
+  if (relevantMatches.length === 0) {
+    headToHeadBody.innerHTML = '<tr><td colspan="4">Нет очных встреч</td></tr>';
+    headToHeadSummary.innerHTML = '';
+    return;
+  }
+
   headToHeadBody.innerHTML = '';
 
-  const sortedMatches = [...matches].sort((a, b) => (b.startTimestamp ?? 0) - (a.startTimestamp ?? 0));
+  const sortedMatches = [...relevantMatches].sort((a, b) => (b.startTimestamp ?? 0) - (a.startTimestamp ?? 0));
 
   sortedMatches.forEach(match => {
     const row = document.createElement('tr');
@@ -647,6 +1034,14 @@ function extractScoreValue(score, side) {
     return score;
   }
 
+  if (Array.isArray(score)) {
+    const [first, second] = score;
+    if (side === 'away') {
+      return Number.isFinite(second) ? second : extractScoreFromValue(second, side);
+    }
+    return Number.isFinite(first) ? first : extractScoreFromValue(first, side);
+  }
+
   if (typeof score.final === 'number') {
     return score.final;
   }
@@ -785,4 +1180,3 @@ dateInput.addEventListener('change', fetchMatches);
 
 initDate();
 fetchMatches();
-// Обновление сортировки матчей
