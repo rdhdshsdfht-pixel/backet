@@ -1272,3 +1272,4 @@ dateInput.addEventListener('change', fetchMatches);
 
 initDate();
 fetchMatches();
+// Обновление сортировки матчей
