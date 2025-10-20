@@ -33,28 +33,94 @@
   </header>
 
   <main>
-    <table id="matches">
-      <thead>
-        <tr>
-          <th>Страна</th>
-          <th>Дата</th>
-          <th>Лига</th>
-          <th>Дом</th>
-          <th>Счёт</th>
-          <th>Гость</th>
-          <th>Статус</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td colspan="7">Загрузка...</td>
-        </tr>
-      </tbody>
-    </table>
+    <section id="matchesView">
+      <table id="matches">
+        <thead>
+          <tr>
+            <th>Страна</th>
+            <th>Дата</th>
+            <th>Лига</th>
+            <th>Дом</th>
+            <th>Счёт</th>
+            <th>Гость</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td colspan="7">Загрузка...</td>
+          </tr>
+        </tbody>
+      </table>
 
-    <footer>
-      <p>Источник данных: BasketAPI (RapidAPI) · Таймзона: Москва</p>
-    </footer>
+      <footer>
+        <p>Источник данных: BasketAPI (RapidAPI) · Таймзона: Москва</p>
+      </footer>
+    </section>
+
+    <section id="matchCenter" class="hidden">
+      <button id="backToList" class="back-button">← Назад к матчам</button>
+
+      <div class="match-center-header">
+        <div class="team-card">
+          <h2 id="homeTeamName">Домашняя команда</h2>
+          <p id="homeTeamMeta" class="team-meta"></p>
+        </div>
+
+        <div class="match-center-meta">
+          <span id="matchCenterDate"></span>
+          <span id="matchCenterTournament"></span>
+          <span id="matchCenterStatus"></span>
+          <span id="matchCenterCountry"></span>
+        </div>
+
+        <div class="team-card">
+          <h2 id="awayTeamName">Гостевая команда</h2>
+          <p id="awayTeamMeta" class="team-meta"></p>
+        </div>
+      </div>
+
+      <div class="match-center-score" id="matchCenterScore"></div>
+
+      <div id="matchCenterError" class="error-message" role="alert"></div>
+
+      <div class="match-history">
+        <div class="history-column">
+          <h3 id="homeHistoryTitle">Последние матчи</h3>
+          <ul id="homeHistoryList" class="history-list">
+            <li class="placeholder">Нет данных</li>
+          </ul>
+        </div>
+
+        <div class="history-column">
+          <h3 id="awayHistoryTitle">Последние матчи</h3>
+          <ul id="awayHistoryList" class="history-list">
+            <li class="placeholder">Нет данных</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="head-to-head">
+        <h3>Очные встречи и проходимость</h3>
+        <table id="headToHead">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Турнир</th>
+              <th>Счёт</th>
+              <th>Победитель</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="4">Нет данных</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div id="headToHeadSummary" class="summary-grid"></div>
+      </div>
+    </section>
   </main>
 
   <script src="config.js"></script>
