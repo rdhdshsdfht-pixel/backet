@@ -3,6 +3,7 @@ const leagueSelect = document.querySelector('#league');
 const searchInput = document.querySelector('#search');
 const refreshBtn = document.querySelector('#refresh');
 const dateInput = document.querySelector('#date');
+const sortSelect = document.querySelector('#sort');
 
 let allMatches = [];
 
@@ -21,7 +22,7 @@ function formatDateForAPI(isoDate) {
 
 async function fetchMatches() {
   const dateFormatted = formatDateForAPI(dateInput.value);
-  tableBody.innerHTML = '<tr><td colspan="6">Загрузка...</td></tr>';
+  tableBody.innerHTML = '<tr><td colspan="7">Загрузка...</td></tr>';
 
   try {
     const res = await fetch(`${API_BASE}?date=${dateFormatted}`);
@@ -38,10 +39,12 @@ async function fetchMatches() {
       allMatches = [];
     }
 
+    allMatches = normalizeMatches(allMatches);
+
     fillLeagues();
     renderTable();
   } catch (err) {
-    tableBody.innerHTML = `<tr><td colspan="6">Ошибка: ${err.message}</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="7">Ошибка: ${err.message}</td></tr>`;
   }
 }
 
@@ -57,10 +60,9 @@ function fillLeagues() {
 }
 
 function renderTable() {
-  const tableBody = document.querySelector('#matches tbody');
-  const leagueFilter = document.getElementById('league').value;
-  const searchQuery = document.getElementById('search').value.toLowerCase();
-  const liveOnly = document.getElementById('liveOnly').checked;
+  const leagueFilter = leagueSelect.value;
+  const searchQuery = searchInput.value.toLowerCase();
+  const liveOnly = liveOnlyCheckbox.checked;
 
   let filtered = allMatches;
 
@@ -89,12 +91,14 @@ function renderTable() {
   tableBody.innerHTML = '';
 
   if (filtered.length === 0) {
-    tableBody.innerHTML = '<tr><td colspan="6">Нет матчей</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="7">Нет матчей</td></tr>';
     return;
   }
 
+  const sorted = sortMatches(filtered);
+
   // Формируем строки таблицы
-  filtered.forEach(match => {
+  sorted.forEach(match => {
     const row = document.createElement('tr');
 
     const date = new Date(match.startTimestamp * 1000).toLocaleString('ru-RU', {
@@ -102,6 +106,7 @@ function renderTable() {
     });
 
     row.innerHTML = `
+      <td>${match.countryName}</td>
       <td>${date}</td>
       <td>${match.tournament?.name || ''}</td>
       <td>${match.homeTeam?.name || ''}</td>
@@ -114,16 +119,70 @@ function renderTable() {
   });
 }
 
-document.getElementById('liveOnly').addEventListener('change', renderTable);
-document.getElementById('search').addEventListener('input', renderTable);
-document.getElementById('league').addEventListener('change', renderTable);
+function normalizeMatches(matches) {
+  return matches.map(match => ({
+    ...match,
+    countryName: resolveCountryName(match)
+  }));
+}
+
+function resolveCountryName(match) {
+  const candidates = [
+    match.tournament?.country?.name,
+    match.tournament?.category?.name,
+    match.country?.name,
+    match.homeTeam?.country?.name,
+    match.awayTeam?.country?.name
+  ].filter(Boolean);
+
+  if (candidates.length > 0) {
+    return candidates[0];
+  }
+
+  const leagueName = match.tournament?.name;
+  if (leagueName) {
+    const countryInBrackets = leagueName.match(/\(([^)]+)\)$/);
+    if (countryInBrackets) {
+      return countryInBrackets[1];
+    }
+  }
+
+  return 'Неизвестно';
+}
+
+function sortMatches(matches) {
+  const sorted = [...matches];
+  const mode = sortSelect.value;
+
+  if (mode === 'time') {
+    sorted.sort((a, b) => (a.startTimestamp ?? 0) - (b.startTimestamp ?? 0));
+    return sorted;
+  }
+
+  sorted.sort((a, b) => {
+    const countryA = (a.countryName || '').toLowerCase();
+    const countryB = (b.countryName || '').toLowerCase();
+    const countryCompare = countryA.localeCompare(countryB, 'ru');
+
+    if (countryCompare !== 0) {
+      return countryCompare;
+    }
+
+    return (a.startTimestamp ?? 0) - (b.startTimestamp ?? 0);
+  });
+
+  return sorted;
+}
+
+const liveOnlyCheckbox = document.getElementById('liveOnly');
+
+liveOnlyCheckbox.addEventListener('change', renderTable);
+searchInput.addEventListener('input', renderTable);
+leagueSelect.addEventListener('change', renderTable);
+sortSelect.addEventListener('change', renderTable);
 
 refreshBtn.addEventListener('click', fetchMatches);
-leagueSelect.addEventListener('change', renderTable);
-searchInput.addEventListener('input', renderTable);
 dateInput.addEventListener('change', fetchMatches);
 
 initDate();
-fetchMatches();// Обновление сортировки матчей
-// Обновление сортировки матчей
-// Обновление сортировки матчей
+fetchMatches();

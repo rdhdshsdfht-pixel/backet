@@ -25,6 +25,10 @@
 
       <input type="text" id="search" placeholder="Поиск по команде...">
       <button id="refresh">🔄 Обновить</button>
+      <select id="sort">
+        <option value="country">Сначала страны (А-Я)</option>
+        <option value="time">По времени начала</option>
+      </select>
     </div>
   </header>
 
@@ -32,6 +36,7 @@
     <table id="matches">
       <thead>
         <tr>
+          <th>Страна</th>
           <th>Дата</th>
           <th>Лига</th>
           <th>Дом</th>
@@ -42,7 +47,7 @@
       </thead>
       <tbody>
         <tr>
-          <td colspan="6">Загрузка...</td>
+          <td colspan="7">Загрузка...</td>
         </tr>
       </tbody>
     </table>
