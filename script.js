@@ -382,7 +382,15 @@ function normalizeMatchCenterPayload(payload) {
     'homeMatches',
     'home',
     'homeTeamMatches',
-    'home_last_matches'
+    'home_last_matches',
+    'homeTeamLastMatches',
+    'home_team_last_matches',
+    'homeForm',
+    'home_team_form',
+    'team1LastMatches',
+    'team1_last_matches',
+    'lastMatchesHome',
+    'last_matches_home'
   ]);
   const awayRecentRaw = pickArray(source, [
     'awayRecent',
@@ -390,7 +398,15 @@ function normalizeMatchCenterPayload(payload) {
     'awayMatches',
     'away',
     'awayTeamMatches',
-    'away_last_matches'
+    'away_last_matches',
+    'awayTeamLastMatches',
+    'away_team_last_matches',
+    'awayForm',
+    'away_team_form',
+    'team2LastMatches',
+    'team2_last_matches',
+    'lastMatchesAway',
+    'last_matches_away'
   ]);
 
   return {
@@ -426,22 +442,71 @@ function pickArray(object, keys) {
   }
 
   for (const key of keys) {
-    const value = object[key];
-    if (Array.isArray(value)) {
-      return value;
+    if (!(key in object)) {
+      continue;
     }
-    if (value && Array.isArray(value.matches)) {
-      return value.matches;
+
+    const extracted = extractArray(object[key]);
+    if (extracted.length > 0) {
+      return extracted;
     }
-    if (value && Array.isArray(value.events)) {
-      return value.events;
+  }
+
+  const lowerKeys = keys.map(key => key.toLowerCase());
+
+  for (const [entryKey, entryValue] of Object.entries(object)) {
+    const matchesKey = lowerKeys.some(candidate => entryKey.toLowerCase().includes(candidate));
+    if (!matchesKey) {
+      continue;
     }
-    if (value && Array.isArray(value.data)) {
-      return value.data;
+
+    const extracted = extractArray(entryValue);
+    if (extracted.length > 0) {
+      return extracted;
     }
   }
 
   return [];
+}
+
+function extractArray(value) {
+  if (!value) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return filterMatchLike(value);
+  }
+
+  if (typeof value !== 'object') {
+    return [];
+  }
+
+  const nestedKeys = ['matches', 'events', 'games', 'data', 'list', 'items', 'rows'];
+  for (const key of nestedKeys) {
+    if (Array.isArray(value[key])) {
+      return filterMatchLike(value[key]);
+    }
+  }
+
+  for (const nested of Object.values(value)) {
+    if (Array.isArray(nested)) {
+      const filtered = filterMatchLike(nested);
+      if (filtered.length > 0) {
+        return filtered;
+      }
+    }
+  }
+
+  return [];
+}
+
+function filterMatchLike(collection) {
+  if (!Array.isArray(collection)) {
+    return [];
+  }
+
+  return collection.filter(item => item && typeof item === 'object');
 }
 
 function normalizeMatchList(matches) {
@@ -1026,7 +1091,7 @@ function extractScores(match) {
 }
 
 function extractScoreValue(score, side) {
-  if (!score) {
+  if (score === undefined || score === null) {
     return null;
   }
 
@@ -1134,11 +1199,38 @@ function isSameTeam(candidate, reference) {
     return candidate.slug === reference.slug;
   }
 
-  if (candidate.name && reference.name) {
-    return candidate.name.toLowerCase() === reference.name.toLowerCase();
+  const candidateName = extractTeamName(candidate);
+  const referenceName = extractTeamName(reference);
+
+  if (candidateName && referenceName) {
+    const normalizedCandidate = normalizeTeamName(candidateName);
+    const normalizedReference = normalizeTeamName(referenceName);
+
+    if (normalizedCandidate === normalizedReference) {
+      return true;
+    }
+
+    return (
+      normalizedCandidate.includes(normalizedReference) ||
+      normalizedReference.includes(normalizedCandidate)
+    );
   }
 
   return false;
+}
+
+function normalizeTeamName(name) {
+  if (!name) {
+    return '';
+  }
+
+  return name
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .toLowerCase();
 }
 
 function formatScore(home, away) {
@@ -1180,4 +1272,3 @@ dateInput.addEventListener('change', fetchMatches);
 
 initDate();
 fetchMatches();
-// Обновление сортировки матчей
